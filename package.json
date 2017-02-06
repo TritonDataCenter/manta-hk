@@ -18,7 +18,7 @@
 		"jsprim": "^0.6.1",
 		"cmdln": "^3.2.1",
 		"cmdutil": "^0.1.0",
-		"manta": "^1.5.1",
+		"manta": "^4.1.1",
 		"posix-getopt": "^1.1.0",
 		"strsplit": "^1.0.0",
 		"verror": "^1.6.0",

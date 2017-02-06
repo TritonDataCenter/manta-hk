@@ -14,6 +14,12 @@
  * manta-hk: manage Manta housekeeping operations
  */
 
+/*
+ * XXX
+ */
+require('http').globalAgent.maxSockets = 256;
+require('https').globalAgent.maxSockets = 256;
+
 var mod_bunyan = require('bunyan');
 var mod_cmdln = require('cmdln');
 var mod_cmdutil = require('cmdutil');
@@ -27,6 +33,7 @@ var sprintf = mod_extsprintf.sprintf;
 
 var mod_dumps = require('../lib/dumps');
 var mod_metering = require('../lib/metering');
+var mod_logs = require('../lib/logs');
 
 /*
  * Command-line option definitions common to multiple subcommands.
@@ -344,6 +351,176 @@ function printGnuplotDataset(shards, dumps, valuefunc)
 		printf('\n\n');
 	});
 }
+
+MantaHk.prototype.do_logs = function (subcmd, opts, args, callback)
+{
+	var config = {
+		'manta': this.mhk_manta,
+		'services': [],
+		'before': opts.before,
+		'after': opts.after,
+		'start': opts.date,
+		'logCallback': null
+	};
+	var table = {};
+
+	if (opts.context) {
+		config.before = config.after = opts.context;
+	}
+
+	var dt = new Date();
+	dt.setUTCMilliseconds(0);
+	dt.setUTCSeconds(0);
+	dt.setUTCMinutes(0);
+	dt.setUTCHours(config.start.getUTCHours() - 1);
+
+	if (opts.date.valueOf() > dt.valueOf())
+		config.start = dt;
+
+
+	if (args.length < 1) {
+		/*
+		 * XXX
+		 */
+		mod_cmdutil.fail('usage: must specify service names');
+	}
+
+	if (opts.table) {
+		config.logCallback = function (ent) {
+			if (ent.size < opts.size)
+				return;
+
+			var dstr = ent.date.toISOString();
+
+			if (!table[dstr]) {
+				table[dstr] = {};
+			}
+
+			if (!table[dstr][ent.service]) {
+				table[dstr][ent.service] = 0;
+			}
+
+			table[dstr][ent.service]++;
+		};
+	} else {
+		config.logCallback = function (ent) {
+			if (ent.size < opts.size)
+				return;
+
+			printf('%s/%s\n', ent.dir, ent.name);
+		};
+	}
+
+	var addService = function (name) {
+		if (name === 'mako-access.log')
+			name = 'mako-access';
+
+		if (name === 'mako-error.log')
+			name = 'mako-error';
+
+		if (config.services.indexOf(name) === -1)
+			config.services.push(name);
+	};
+
+	var finish = function () {
+		mod_logs.listLogs(config, function (err, result) {
+			if (err) {
+				mod_cmdutil.fail(err);
+			}
+
+			if (opts.table) {
+				var dates = Object.keys(table).sort();
+
+				dates.forEach(function (dt) {
+					var col0 = dt.substr(0, 13);
+
+					config.services.forEach(function (s) {
+						var v = table[dt][s] || 0;
+
+						printf('%13s  %16s %6d\n',
+						    col0, s, v);
+
+						/*
+						 * Only print the date on
+						 * the first row for this
+						 * hour.
+						 */
+						col0 = '';
+					});
+
+					printf('\n');
+				});
+			}
+
+			callback();
+		});
+	};
+
+	if (args.indexOf('all') === -1) {
+		args.forEach(addService);
+
+		finish();
+		return;
+	}
+
+	if (args.length !== 1) {
+		mod_cmdutil.fail('special service "all" must appear alone');
+	}
+
+	this.mhk_manta.ls('/poseidon/stor/logs', function (err, res) {
+		if (err) {
+			mod_cmdutil.fail(err);
+		}
+
+		res.on('directory', function (dir) {
+			addService(dir.name);
+		});
+
+		res.on('end', function () {
+			finish();
+		});
+	});
+};
+
+MantaHk.prototype.do_logs.options = [
+    mhkCommonOptions['date'],
+    {
+	'names': [ 'before', 'B' ],
+	'type': 'positiveInteger',
+	'helpArg': 'NHOURS',
+	'help': 'Scan backwards NHOURS from DATE',
+	'default': 0
+    }, {
+	'names': [ 'after', 'A' ],
+	'type': 'positiveInteger',
+	'helpArg': 'NHOURS',
+	'help': 'Scan forwards NHOURS from DATE',
+	'default': 0
+    }, {
+	'names': [ 'context', 'C' ],
+	'type': 'positiveInteger',
+	'helpArg': 'NHOURS',
+	'help': 'Scan backwards and forwards NHOURS from DATE',
+	'default': 0
+    }, {
+	'names': [ 'size', 's' ],
+	'type': 'integer',
+	'helpArg': 'NBYTES',
+	'help': 'Only include log files that are at least NBYTES in size.',
+	'default': 0
+    }, {
+	'names': [ 'table', 't' ],
+	'type': 'bool',
+	'help': 'Summarise counts in a table',
+	'default': false
+    }
+];
+
+MantaHk.prototype.do_logs.help = [
+    'List log files.',
+    '',
+    '{{options}}'
+].join('\n');
 
 MantaHk.prototype.do_metering_reports = function (subcmd, opts, args, callback)
 {
