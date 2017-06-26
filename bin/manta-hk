@@ -368,17 +368,22 @@ MantaHk.prototype.do_logs = function (subcmd, opts, args, callback)
 		config.before = config.after = opts.context;
 	}
 
-	var dt = new Date();
-	dt.setUTCMilliseconds(0);
-	dt.setUTCSeconds(0);
-	dt.setUTCMinutes(0);
-	dt.setUTCHours(config.start.getUTCHours() - 1);
+        if (!opts.date) {
+                /*
+                 * If we were not given a date, we want the date for
+                 * the hour before.  XXX This makes it hard to use
+                 * the common "date" option definition.
+                 */
+                var dt = new Date();
+                dt.setUTCMilliseconds(0);
+                dt.setUTCSeconds(0);
+                dt.setUTCMinutes(0);
+                dt.setUTCHours(dt.getUTCHours() - 1);
 
-	if (opts.date.valueOf() > dt.valueOf())
-		config.start = dt;
+                config.start = dt;
+        }
 
-
-	if (args.length < 1) {
+	if (args.length < 1 && !opts.list) {
 		/*
 		 * XXX
 		 */
@@ -456,14 +461,14 @@ MantaHk.prototype.do_logs = function (subcmd, opts, args, callback)
 		});
 	};
 
-	if (args.indexOf('all') === -1) {
+	if (args.indexOf('all') === -1 && !opts.list) {
 		args.forEach(addService);
 
 		finish();
 		return;
 	}
 
-	if (args.length !== 1) {
+	if (args.length !== 1 && !opts.list) {
 		mod_cmdutil.fail('special service "all" must appear alone');
 	}
 
@@ -477,14 +482,31 @@ MantaHk.prototype.do_logs = function (subcmd, opts, args, callback)
 		});
 
 		res.on('end', function () {
-			finish();
+			if (!opts.list) {
+				finish();
+				return;
+			}
+
+			/*
+			 * We were asked to list (-l) the services we
+			 * can see.
+			 */
+                        config.services.sort();
+			config.services.forEach(function (s) {
+				printf('%s\n', s);
+			});
+			callback();
 		});
 	});
 };
 
 MantaHk.prototype.do_logs.options = [
-    mhkCommonOptions['date'],
     {
+	'names': [ 'date', 'd' ],
+	'type': 'date',
+	'helpArg': 'DATE',
+	'help': 'Scan backwards from date DATE',
+    }, {
 	'names': [ 'before', 'B' ],
 	'type': 'positiveInteger',
 	'helpArg': 'NHOURS',
@@ -512,6 +534,11 @@ MantaHk.prototype.do_logs.options = [
 	'names': [ 'table', 't' ],
 	'type': 'bool',
 	'help': 'Summarise counts in a table',
+	'default': false
+    }, {
+	'names': [ 'list', 'l' ],
+	'type': 'bool',
+	'help': 'List the log service names that we know about.',
 	'default': false
     }
 ];
