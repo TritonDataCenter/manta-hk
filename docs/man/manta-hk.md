@@ -4,12 +4,14 @@
 
 manta-hk - manage Manta housekeeping operations
 
+
 ## SYNOPSIS
 
-manta-hk dumps [--date DATE] [--ndays NDAYS] [--shard SHARDNAME]
+manta-hk dumps [--date DATE] [--days NDAYS] [--shard SHARDNAME]
     [--gnuplot]
 
-manta-hk metering-reports [--date DATE] [--ndays NDAYS]
+manta-hk metering-reports [--date DATE] [--days NDAYS]
+
 
 ## DESCRIPTION
 
@@ -97,7 +99,7 @@ List information about dumps for the last few days:
 
 List information about dumps from shards 3 and 4 on July 3, 2015:
 
-    $ manta-hk dumps --date=2015-07-03 --days=1 
+    $ manta-hk dumps --date=2015-07-03 --days=1
         --shard=3.moray.us-east.joyent.us --shard=4.moray.us-east.joyent.us
     Dumps for 2015-07-03      SHARD     MB  ELAPSED          ENDED  #UNPACKED
           3.moray.us-east.joyent.us   6897   15m28s  00:15:27.342Z  5
@@ -159,5 +161,5 @@ hours may be missing, which may look like this:
 ## SEE ALSO
 
 This repository is part of the Joyent Manta project.  For contribution
-guidelines, issues, and general documentation, visit the 
+guidelines, issues, and general documentation, visit the
 Manta project page at http://github.com/joyent/manta.
